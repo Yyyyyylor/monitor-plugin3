@@ -15,7 +15,7 @@ desc: |
   - 全量数据导入导出（cs2mon 格式）
 version: 3.0.0
 author: Reasonix Team
-repo: https://github.com/your-repo/astrbot-monitor-v3
+repo: https://github.com/Yyyyyylor/monitor-plugin3
 astrbot_version: ">=4.16"
 support_platforms:
   - aiocqhttp
