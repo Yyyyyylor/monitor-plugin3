@@ -1,0 +1,23 @@
+name: monitor_plugin3
+display_name: Steam CS2 库存监控器 v3
+short_desc: 监控 CS2 库存变化，通过 QQ 主动推送图片消息
+desc: |
+  Steam CS2 库存监控插件 v3（基于 monitor ver3.x 构建）。支持多账号分层定时爬取、
+  四类差异检测（新增/移除/修改/交换）、库存活动分类、批量合并推送与文生图渲染，
+  内置饰品名称汉化（8677+ 条映射）与四模式代理自动检测。
+
+  核心特性：
+  - 支持统一间隔或高/中/低频分层调度
+  - 指纹哈希优化快速识别物品属性变化
+  - 支持私密库存查询（配置 steamLoginSecure cookie）
+  - 每日快照归档 + 过期数据清理
+  - 软删除/回收站管理
+  - 全量数据导入导出（cs2mon 格式）
+version: 3.0.0
+author: Reasonix Team
+repo: https://github.com/your-repo/astrbot-monitor-v3
+astrbot_version: ">=4.16"
+support_platforms:
+  - aiocqhttp
+  - qq_official
+  - telegram

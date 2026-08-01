@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>库存报告</title>
+    <style>
+        :root {
+            --bg-color: #f5f5f5;
+            --card-bg: #ffffff;
+            --text-primary: #333333;
+            --text-secondary: #666666;
+            --accent-color: #4a90e2;
+            --border-radius: 8px;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg-color: #1a1a1a;
+                --card-bg: #2d2d2d;
+                --text-primary: #e0e0e0;
+                --text-secondary: #b0b0b0;
+                --accent-color: #69b1ff;
+            }
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: var(--bg-color);
+            margin: 0;
+            padding: 16px;
+            color: var(--text-primary);
+        }
+
+        .container {
+            max-width: 640px;
+            margin: 0 auto;
+            background: var(--card-bg);
+            border-radius: var(--border-radius);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #4a90e2, #69b1ff);
+            color: white;
+            padding: 24px;
+            text-align: center;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 22px;
+        }
+
+        .content {
+            padding: 24px;
+        }
+
+        .meta {
+            font-size: 14px;
+            color: var(--text-secondary);
+            text-align: center;
+            margin-bottom: 16px;
+            line-height: 1.8;
+        }
+
+        .meta .nickname {
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+
+        .summary-bar {
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 16px;
+            padding: 12px;
+            background: var(--bg-color);
+            border-radius: var(--border-radius);
+            font-size: 13px;
+            color: var(--text-secondary);
+            text-align: center;
+        }
+
+        .summary-bar .value {
+            font-size: 20px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .inv-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+
+        .inv-table th {
+            text-align: left;
+            padding: 8px 10px;
+            border-bottom: 2px solid var(--accent-color);
+            color: var(--text-secondary);
+            font-size: 12px;
+        }
+
+        .inv-table td {
+            padding: 7px 10px;
+            border-bottom: 1px solid rgba(128,128,128,0.15);
+        }
+
+        .inv-name {
+            word-break: break-all;
+        }
+
+        .inv-count {
+            text-align: right;
+            font-weight: 600;
+            color: var(--accent-color);
+            white-space: nowrap;
+        }
+
+        .truncated-note {
+            margin-top: 12px;
+            text-align: center;
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        .timestamp {
+            margin-top: 16px;
+            padding-top: 12px;
+            border-top: 1px solid var(--text-secondary);
+            font-size: 12px;
+            color: var(--text-secondary);
+            text-align: center;
+        }
+
+        .empty {
+            text-align: center;
+            padding: 24px;
+            color: var(--text-secondary);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎒 库存报告</h1>
+        </div>
+
+        <div class="content">
+            <div class="meta">
+                <div class="nickname">{{ nickname }}</div>
+                <div>{{ steam_id }}</div>
+            </div>
+
+            <div class="summary-bar">
+                <div>
+                    <div class="value">{{ total_count }}</div>
+                    <div>物品总数</div>
+                </div>
+                <div>
+                    <div class="value">{{ group_count }}</div>
+                    <div>饰品种类</div>
+                </div>
+                <div>
+                    <div class="value">{{ api_total }}</div>
+                    <div>API Total</div>
+                </div>
+            </div>
+
+            {% if groups %}
+            <table class="inv-table">
+                <tr>
+                    <th>饰品名称</th>
+                    <th style="text-align:right;">数量</th>
+                </tr>
+                {% for g in groups %}
+                <tr>
+                    <td class="inv-name">{{ g.name }}</td>
+                    <td class="inv-count">×{{ g.count }}</td>
+                </tr>
+                {% endfor %}
+            </table>
+            {% if truncated %}
+            <div class="truncated-note">... 其余 {{ truncated_count }} 种未显示</div>
+            {% endif %}
+            {% else %}
+            <div class="empty">📭 库存为空</div>
+            {% endif %}
+
+            <div class="timestamp">生成于 {{ generated_at }}</div>
+        </div>
+    </div>
+</body>
+</html>

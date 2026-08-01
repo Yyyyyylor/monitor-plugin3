@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>库存变化报告</title>
+    <style>
+        :root {
+            --bg-color: #f5f5f5;
+            --card-bg: #ffffff;
+            --text-primary: #333333;
+            --text-secondary: #666666;
+            --accent-color: #4a90e2;
+            --success-color: #52c41a;
+            --warning-color: #faad14;
+            --danger-color: #f5222d;
+            --border-radius: 8px;
+            --spacing-sm: 8px;
+            --spacing-md: 16px;
+            --spacing-lg: 24px;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg-color: #1a1a1a;
+                --card-bg: #2d2d2d;
+                --text-primary: #e0e0e0;
+                --text-secondary: #b0b0b0;
+                --accent-color: #69b1ff;
+            }
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: var(--bg-color);
+            margin: 0;
+            padding: var(--spacing-md);
+            color: var(--text-primary);
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: var(--card-bg);
+            border-radius: var(--border-radius);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, var(--accent-color), #69b1ff);
+            color: white;
+            padding: var(--spacing-lg);
+            text-align: center;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        .content {
+            padding: var(--spacing-lg);
+        }
+
+        .summary {
+            font-size: 16px;
+            line-height: 1.5;
+            margin-bottom: var(--spacing-md);
+            color: var(--text-primary);
+        }
+
+        .activity {
+            background: rgba(74, 144, 226, 0.1);
+            border-left: 4px solid var(--accent-color);
+            padding: var(--spacing-sm) var(--spacing-md);
+            margin-bottom: var(--spacing-md);
+            font-size: 14px;
+            color: var(--text-primary);
+        }
+
+        .details {
+            margin-top: var(--spacing-md);
+        }
+
+        .detail-item {
+            padding: var(--spacing-sm);
+            margin-bottom: var(--spacing-sm);
+            border-radius: 4px;
+            background: var(--bg-color);
+            font-size: 14px;
+            white-space: pre-line;
+        }
+
+        .detail-added {
+            border-left: 3px solid var(--success-color);
+        }
+
+        .detail-removed {
+            border-left: 3px solid var(--danger-color);
+        }
+
+        .detail-modified {
+            border-left: 3px solid var(--warning-color);
+        }
+
+        .detail-swapped {
+            border-left: 3px solid var(--accent-color);
+        }
+
+        .timestamp {
+            margin-top: var(--spacing-lg);
+            padding-top: var(--spacing-md);
+            border-top: 1px solid var(--text-secondary);
+            font-size: 12px;
+            color: var(--text-secondary);
+            text-align: center;
+        }
+
+        .stats {
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: var(--spacing-md);
+        }
+
+        .stat-item {
+            text-align: center;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .stat-value {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 Steam 库存变化报告</h1>
+        </div>
+
+        <div class="content">
+            <div class="summary">
+                {{ summary }}
+            </div>
+
+            <div class="stats">
+                <div class="stat-item">
+                    <div class="stat-value">{{ stats.added }}</div>
+                    <div>新增</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">{{ stats.removed }}</div>
+                    <div>移除</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">{{ stats.modified }}</div>
+                    <div>修改</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">{{ stats.swapped }}</div>
+                    <div>交换</div>
+                </div>
+            </div>
+
+            {% if activity_summary %}
+            <div class="activity">
+                <strong>{{ activity_summary }}</strong>
+            </div>
+            {% endif %}
+
+            <div class="details">
+                {% for detail in details %}
+                <div class="detail-item detail-{{ detail.type }}">
+                    {{ detail.text }}
+                </div>
+                {% endfor %}
+            </div>
+
+            <div class="timestamp">
+                Steam ID: {{ steam_id }} · {{ timestamp }}
+            </div>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,118 @@
+{
+  "steam_ids": {
+    "description": "预置 Steam ID 列表（逗号分隔）",
+    "type": "text",
+    "hint": "插件启动时自动添加的监控账号（未绑定会话，仅监控；推荐用 /addaccount 添加以绑定推送会话）",
+    "default": ""
+  },
+  "fetch_interval_minutes": {
+    "description": "统一监控间隔（分钟）",
+    "type": "int",
+    "hint": "未启用分层调度时的全局轮询间隔",
+    "default": 60
+  },
+  "message_interval_minutes": {
+    "description": "消息投递间隔（分钟）",
+    "type": "int",
+    "hint": "累积变化合并投递的周期，可用 /messagegap 动态调整",
+    "default": 30
+  },
+  "tiered_scheduling": {
+    "description": "分层调度",
+    "type": "object",
+    "items": {
+      "enabled": { "description": "启用分层调度", "type": "bool", "default": false },
+      "high_interval_minutes": { "description": "高频间隔（分钟）", "type": "int", "default": 5 },
+      "medium_interval_minutes": { "description": "中频间隔（分钟）", "type": "int", "default": 10 },
+      "low_interval_minutes": { "description": "低频间隔（分钟）", "type": "int", "default": 20 },
+      "user_spacing_seconds": {
+        "description": "用户间请求间隔（秒）",
+        "type": "float",
+        "hint": "同一轮内相邻账号的请求间隔，降低 Steam 限流风险",
+        "default": 1.5
+      }
+    }
+  },
+  "proxy": {
+    "description": "Steam API 代理设置",
+    "type": "object",
+    "items": {
+      "mode": {
+        "description": "代理模式",
+        "type": "string",
+        "options": ["auto", "manual", "hosts", "none"],
+        "default": "auto"
+      },
+      "manual_url": {
+        "description": "手动代理地址",
+        "type": "string",
+        "hint": "mode=manual 时生效，支持 http:// 与 socks5://",
+        "default": ""
+      },
+      "hosts_override": {
+        "description": "Hosts 覆盖地址",
+        "type": "string",
+        "hint": "mode=hosts 时生效，如 127.0.0.1:443",
+        "default": ""
+      }
+    }
+  },
+  "steam_cookie": {
+    "description": "Steam 登录 Cookie（可选）",
+    "type": "string",
+    "hint": "steamLoginSecure，用于访问私密库存或缓解限流。浏览器 F12 → Cookies → steamcommunity.com 复制",
+    "default": ""
+  },
+  "crawler_settings": {
+    "description": "爬虫设置",
+    "type": "object",
+    "items": {
+      "request_delay_seconds": { "description": "请求间隔（秒）", "type": "float", "default": 1.2 },
+      "request_timeout_seconds": { "description": "请求超时（秒）", "type": "int", "default": 30 },
+      "max_retries": { "description": "最大重试次数", "type": "int", "default": 3 },
+      "page_size": { "description": "每页物品数", "type": "int", "default": 2000 }
+    }
+  },
+  "admin_notify": {
+    "description": "管理员告警",
+    "type": "object",
+    "items": {
+      "enabled": { "description": "启用管理员告警", "type": "bool", "default": false },
+      "admin_umos": {
+        "description": "管理员会话标识（逗号分隔）",
+        "type": "text",
+        "hint": "unified_msg_origin 列表，账号连续失败达阈值时推送告警",
+        "default": ""
+      },
+      "consecutive_fail_threshold": { "description": "连续失败阈值", "type": "int", "default": 3 }
+    }
+  },
+  "text_to_image_plugin": {
+    "description": "外部文生图插件",
+    "type": "object",
+    "items": {
+      "use_external": {
+        "description": "使用外部文生图插件",
+        "type": "bool",
+        "hint": "关闭则使用内置 html_render",
+        "default": false
+      },
+      "plugin_name": { "description": "插件名称", "type": "string", "default": "text_to_image" }
+    }
+  },
+  "retention": {
+    "description": "数据保留设置",
+    "type": "object",
+    "items": {
+      "change_retention_days": { "description": "变化事件保留天数", "type": "int", "default": 7 },
+      "archive_retention_days": { "description": "快照归档保留天数", "type": "int", "default": 90 },
+      "compact_hour": { "description": "每日维护时间（0-23 时）", "type": "int", "default": 3 },
+      "snapshot_interval_hours": {
+        "description": "归档间隔（小时）",
+        "type": "int",
+        "hint": "0=仅每日一次；>0=每 N 小时归档一次",
+        "default": 0
+      }
+    }
+  }
+}
