@@ -172,6 +172,19 @@ async def _do_monitor_users(
         stats["success"], stats["fail"], stats["total_events"], elapsed,
     )
     _last_cycle_stats.update(stats)
+
+    # 无变化通知：周期内所有账号均无变化且开关开启时，向绑定会话发送汇总
+    if (
+        stats.get("success", 0) > 0
+        and stats.get("total_events", 0) == 0
+        and settings.non_change_message_enabled
+    ):
+        try:
+            from ..notifier.dispatcher import notify_no_change
+            await notify_no_change(users, stats)
+        except Exception as exc:
+            logger.exception("无变化通知发送失败：%s", exc)
+
     return stats
 
 
@@ -239,11 +252,18 @@ async def _process_single_user(steam_id: str) -> int:
             await _global_message_queue.enqueue(
                 user_record.bound_umo, steam_id, events, activity
             )
+            logger.debug(
+                "用户 %s 变化已入队（%d 事件）→ 会话 %s",
+                steam_id, len(events), user_record.bound_umo[:40],
+            )
         else:
             # 未绑定会话：仅监控入库不投递（plan-v3 R8）
-            logger.info(
-                "用户 %s 未绑定会话（或队列未初始化），变化仅入库不投递",
+            logger.warning(
+                "用户 %s 未绑定会话（bound_umo=%r，队列=%s），变化仅入库不投递；"
+                "请用 /addaccount 重新添加以绑定推送会话",
                 steam_id,
+                (user_record.bound_umo if user_record else None),
+                bool(_global_message_queue),
             )
 
     await reset_failure_count(steam_id)
@@ -320,21 +340,28 @@ async def _tier_worker(tier: str, interval_minutes: int, stop_flag) -> None:
 
 
 async def _message_flush_loop(stop_flag) -> None:
-    """消息投递循环：定时将队列中的通知批量发送到 QQ。"""
-    interval = settings.message_interval_minutes
-    logger.info("启动消息投递循环，间隔=%d 分钟", interval)
+    """消息投递循环：定时将队列中的通知批量发送到 QQ。
+
+    设计（修复"变化不入队/不推送"体验）：
+    - 启动后**立即 flush 一次**，处理插件重启/重载时队列中的存量消息；
+    - 之后每轮从 settings 动态读取投递间隔（/messagegap 修改即时生效），
+      按间隔循环 flush。
+    """
+    logger.info("启动消息投递循环，当前间隔=%d 分钟", settings.message_interval_minutes)
+
     while not stop_flag.is_set():
-        await _sleep_interruptible(interval * 60, stop_flag)
         try:
             from ..notifier.dispatcher import flush_all_notifications
             flushed = await flush_all_notifications()
-            if flushed:
-                logger.info("消息投递完成：成功发送 %d 条通知", flushed)
+            logger.info("消息投递周期完成：成功 %d 条", flushed)
         except asyncio.CancelledError:
             logger.info("消息投递循环已取消")
             raise
         except Exception as exc:
             logger.exception("消息投递循环异常：%s", exc)
+        # 动态读取间隔（/messagegap 修改后下一轮生效）
+        interval = max(1, int(settings.message_interval_minutes))
+        await _sleep_interruptible(interval * 60, stop_flag)
 
 
 async def _daily_maintenance_loop(stop_flag) -> None:

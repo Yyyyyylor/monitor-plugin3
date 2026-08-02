@@ -192,6 +192,13 @@ class MonitorPlugin(Star):
         async for result in restore_account(event, steam_id.strip()):
             yield result
 
+    @filter.command("non-change-message")
+    async def cmd_non_change_message(self, event: AstrMessageEvent, arg: str = ""):
+        """控制监控周期"无变化"通知开关（true/false）"""
+        from .commands.non_change_message import non_change_message
+        async for result in non_change_message(event, arg.strip(), self):
+            yield result
+
     @filter.command("getinventory")
     async def cmd_get_inventory(self, event: AstrMessageEvent, param: str = ""):
         """爬取全部库存内容并投递（按 ID 或昵称）"""

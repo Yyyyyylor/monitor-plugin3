@@ -72,6 +72,7 @@ def test_all_command_modules_importable():
         "compare", "message_gap", "nickname", "crawl_now",
         "proxy_test", "del_account", "restore_account",
         "export_import", "list_accounts", "get_inventory",
+        "non_change_message",
     ]
     for m in modules:
         importlib.import_module(f"monitor_plugin3.commands.{m}")

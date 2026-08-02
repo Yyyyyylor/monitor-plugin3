@@ -163,6 +163,11 @@ class PluginSettings:
     def message_interval_minutes(self) -> int:
         return self._get("message_interval_minutes", default=30)
 
+    # ---- 无变化通知 ----
+    @property
+    def non_change_message_enabled(self) -> bool:
+        return self._get("non_change_message", default=False)
+
 
 # 模块级可变单例：导入即存在（非 None），setup_settings 只更新其内部引用
 settings = PluginSettings()

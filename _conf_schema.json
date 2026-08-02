@@ -17,6 +17,12 @@
     "hint": "累积变化合并投递的周期，可用 /messagegap 动态调整",
     "default": 30
   },
+  "non_change_message": {
+    "description": "无变化通知",
+    "type": "bool",
+    "hint": "开启后，监控周期内所有账号均无库存变化时，向绑定会话发送\"无变化\"信息",
+    "default": false
+  },
   "tiered_scheduling": {
     "description": "分层调度",
     "type": "object",

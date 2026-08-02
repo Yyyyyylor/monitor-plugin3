@@ -34,11 +34,18 @@ class MessageChain:
         self.chain: list = chain or []
 
     def message(self, text: str) -> "MessageChain":
-        self.chain.append(text)
+        from ..message_components import Plain
+        self.chain.append(Plain(text=text))
         return self
 
     def file_image(self, path: str) -> "MessageChain":
-        self.chain.append(("image", path))
+        from ..message_components import Image
+        self.chain.append(Image.fromFileSystem(path))
+        return self
+
+    def url_image(self, url: str) -> "MessageChain":
+        from ..message_components import Image
+        self.chain.append(Image.fromURL(url))
         return self
 
     def __bool__(self) -> bool:

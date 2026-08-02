@@ -47,16 +47,29 @@ class MessageDispatcher:
         """发送纯文本消息到指定会话。"""
         try:
             chain = MessageChain().message(text)
-            return await self.plugin.context.send_message(umo, chain)
+            ok = await self.plugin.context.send_message(umo, chain)
+            if not ok:
+                logger.warning("发送文本消息失败：未找到平台会话 %s", umo[:40])
+            return ok
         except Exception as exc:
             logger.exception("发送纯文本消息失败：%s", exc)
             return False
 
     async def send_image(self, umo: str, image_url: str) -> bool:
-        """发送图片消息到指定会话。"""
+        """发送图片消息到指定会话。
+
+        html_render 返回的是 http(s) URL → 用 url_image（Image.fromURL）；
+        本地路径 → file_image（Image.fromFileSystem）。
+        """
         try:
-            chain = MessageChain().file_image(image_url)
-            return await self.plugin.context.send_message(umo, chain)
+            if image_url.startswith(("http://", "https://")):
+                chain = MessageChain().url_image(image_url)
+            else:
+                chain = MessageChain().file_image(image_url)
+            ok = await self.plugin.context.send_message(umo, chain)
+            if not ok:
+                logger.warning("发送图片消息失败：未找到平台会话 %s", umo[:40])
+            return ok
         except Exception as exc:
             logger.exception("发送图片消息失败：%s", exc)
             return False
@@ -176,6 +189,7 @@ async def flush_all_notifications() -> int:
 
     notifications = await queue.dequeue_all()
     if not notifications:
+        logger.debug("消息投递周期：队列为空，无待投递消息")
         return 0
 
     success_count = 0
@@ -225,6 +239,46 @@ async def notify_admin(steam_id: str, fails: int) -> None:
             logger.info("管理员告警已发送至 %s", umo)
         except Exception as exc:
             logger.exception("管理员告警投递失败（%s）：%s", umo, exc)
+
+
+async def notify_no_change(users, stats: dict[str, Any] | None = None) -> int:
+    """监控周期无变化通知：所有绑定会话去重后发送"无变化"汇总。
+
+    Args:
+        users: 本轮监控的活跃账号列表（含 bound_umo）
+        stats: 本轮统计信息（success/elapsed_sec 等）
+
+    Returns:
+        成功发送条数
+    """
+    if _global_dispatcher is None:
+        logger.warning("dispatcher 未初始化，跳过无变化通知")
+        return 0
+
+    # 按会话去重（一个 QQ 会话监控多个 Steam 只发一条）
+    umos = {
+        getattr(u, "bound_umo", None)
+        for u in users
+        if getattr(u, "bound_umo", None)
+    }
+    if not umos:
+        return 0
+
+    stats = stats or {}
+    text = (
+        "📭 监控周期完成：全部账号均无库存变化\n"
+        f"监控账号：{len(users)} 个\n"
+        f"耗时：{stats.get('elapsed_sec', 0):.1f}s"
+    )
+    sent = 0
+    for umo in umos:
+        try:
+            if await _global_dispatcher.send_text(umo, text):
+                sent += 1
+        except Exception as exc:
+            logger.exception("无变化通知投递失败（%s）：%s", umo, exc)
+    logger.info("无变化通知已发送 %d/%d 个会话", sent, len(umos))
+    return sent
 
 
 async def _last_error_of(steam_id: str) -> str | None:

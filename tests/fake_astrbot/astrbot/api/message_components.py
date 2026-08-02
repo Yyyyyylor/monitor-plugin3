@@ -24,6 +24,11 @@ class At(BaseMessageComponent):
 
 
 class Image(BaseMessageComponent):
+    def __init__(self, url: str = "", file: str = ""):
+        # 真实 AstrBot：fromURL 与 fromFileSystem 最终都落在一个 file 字段，
+        # qq_official 解析（_parse_to_qqofficial）依赖 i.file
+        super().__init__(file=url or file, url=url, file_=file)
+
     @staticmethod
     def fromURL(url: str) -> "Image":
         return Image(url=url)

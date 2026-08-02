@@ -13,6 +13,7 @@
 - ✅ **分层调度**：统一间隔或高/中/低频三级独立队列（默认 5/10/20 分钟）
 - ✅ **四类差异检测**：added/removed/modified/swapped + 指纹哈希优化 + 活动分类
 - ✅ **批量合并投递**：变化事件入内存队列，按 `message_gap` 定时 flush；`/messagegap 0` 立即投递
+- ✅ **无变化通知**：监控周期内所有账号均无变化时，可向绑定会话发送"无变化"汇总（`/non-change-message`）
 - ✅ **四模式代理检测**：auto / manual / hosts / none，自动检测系统代理与加速器端口
 - ✅ **私密库存支持**：`steam_cookie`（steamLoginSecure）配置项
 - ✅ **完整库存查询**：`/getinventory` 按 ID 或昵称爬取并投递全部库存报告
@@ -51,7 +52,7 @@
 - **Python**: ≥3.10
 - **依赖库**: httpx、sqlalchemy[asyncio]、aiosqlite（requirements.txt）
 
-## 指令一览（16 条）
+## 指令一览（17 条）
 
 | 指令 | 用法 | 说明 |
 |------|------|------|
@@ -71,6 +72,7 @@
 | `/restoreaccount` | `/restoreaccount [steam_id]` | 还原账号；不带参数列出回收站 |
 | `/monexport` | `/monexport` | 全量导出 .cs2mon 文件消息 |
 | `/monimport` | `/monimport`（管理员，回复文件） | 导入 .cs2mon 数据 |
+| `/non-change-message` | `/non-change-message true\|false` | 控制监控周期"无变化"通知开关 |
 
 ## 安装指南
 
@@ -91,7 +93,7 @@
 
 ```bash
 python validate.py              # 目录/文件/语法/全模块导入检查
-python -m pytest tests/         # 单元测试（48 项：diff/parser/formatter/config/imports/inventory）
+python -m pytest tests/         # 单元测试（56 项：diff/parser/formatter/config/imports/inventory）
 ```
 
 - 测试通过 `tests/fake_astrbot/` 最小 API 桩模拟 AstrBot 加载，无需 AstrBot 环境
@@ -99,6 +101,22 @@ python -m pytest tests/         # 单元测试（48 项：diff/parser/formatter/
 - `tests/test_config.py` 覆盖可变单例注入回归（settings 导入引用在 setup 后立即生效）
 
 ## 修复记录
+
+### 主动消息投递链路修复（2026-08-02）
+
+**现象**：定时监控检测到库存变化并写入日志，但未主动推送到 QQ。
+
+**审查结论**：入队链路正常（`bound_umo` 绑定成功、变化事件入队）；问题集中在**投递环节**：
+
+| # | 问题 | 修复 |
+|---|------|------|
+| P1 | `_message_flush_loop` 启动后先等 `message_interval_minutes`（默认 30 分钟）才首次 flush | 启动后**立即 flush 一次**（处理存量队列），再按间隔循环 |
+| P2 | flush 成功数为 0 时无日志 | 每轮都打印结果；空队列打 debug |
+| P3 | `send_image` 用 `file_image` 传 `html_render` 返回的 http URL | 智能分支：`http(s)://` → `url_image`，否则 `file_image` |
+| P4 | 投递间隔只在循环启动时读取一次，`/messagegap` 修改不生效 | 每轮从 settings 动态读取 |
+| P5 | `send_message` 返回 False（平台不匹配）静默 | 记 warning；入队/未绑定会话均输出明确日志 |
+
+**验证**：`tests/test_delivery.py` 4 项回归（文本 Plain 构造 / URL 图片 / 本地图片 / send_message False 不抛异常）+ 完整链路集成验证（入队→flush→dispatch→send_message 收到正确 umo 与 chain）。
 
 ### 配置单例注入 bug（2026-08-01）
 
@@ -115,12 +133,12 @@ python -m pytest tests/         # 单元测试（48 项：diff/parser/formatter/
 ```
 monitor-plugin3/
 ├── metadata.yaml          # 插件元数据（name: monitor_plugin3）
-├── main.py                # Star 入口：生命周期 + 16 条指令注册
+├── main.py                # Star 入口：生命周期 + 17 条指令注册
 ├── _conf_schema.json      # 配置 Schema（§8）
 ├── requirements.txt       # httpx / sqlalchemy[asyncio] / aiosqlite
 ├── validate.py            # 一键验证脚本
 │
-├── commands/              # 16 条指令实现
+├── commands/              # 17 条指令实现
 │   ├── validators.py      # steam_id / frequency 校验
 │   ├── add_account.py     # /addaccount（预检→绑定→建基准快照）
 │   ├── get_inventory.py   # 🆕 /getinventory（ID或昵称→爬取→聚合→文本+图片报告）
@@ -135,6 +153,7 @@ monitor-plugin3/
 │   ├── list_accounts.py   # /listaccounts（长列表转图片）
 │   ├── del_account.py     # /delaccount（软删/--purge）
 │   ├── restore_account.py # /restoreaccount（回收站）
+│   ├── non_change_message.py  # /non-change-message（无变化通知开关）
 │   └── export_import.py   # /monexport /monimport
 │
 ├── scheduler/
@@ -158,10 +177,12 @@ monitor-plugin3/
 │
 ├── templates/             # change_report / compare_report / account_list / 🆕 inventory_report
 ├── translate/             # translation_map.json（8677 条）
-└── tests/                 # 48 项单元测试 + fake_astrbot 桩
+└── tests/                 # 56 项单元测试 + fake_astrbot 桩
     ├── fake_astrbot/      # 最小 AstrBot API 桩（无 AstrBot 环境可验证加载）
     ├── test_config.py     # 🆕 配置单例注入回归防护
     ├── test_get_inventory.py  # 🆕 /getinventory 聚合与参数识别
+    ├── test_delivery.py      # 🆕 投递链路回归（P3/P5）
+    ├── test_non_change_message.py  # 🆕 无变化通知
     ├── test_imports.py    # 导入回归（无 src/residue + 插件加载 + 16 条指令）
     ├── test_diff.py       # 差异检测与活动分类
     ├── test_parser.py     # 库存解析
