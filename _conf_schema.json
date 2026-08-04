@@ -20,8 +20,8 @@
   "non_change_message": {
     "description": "无变化通知",
     "type": "bool",
-    "hint": "开启后，监控周期内所有账号均无库存变化时，向绑定会话发送\"无变化\"信息",
-    "default": false
+    "hint": "开启后，监控周期内所有账号均无库存变化时，向绑定会话发送\"无变化\"信息（默认开启，可用 /non-change-message 调整）",
+    "default": true
   },
   "tiered_scheduling": {
     "description": "分层调度",

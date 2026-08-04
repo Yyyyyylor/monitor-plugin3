@@ -10,6 +10,19 @@
 ### 计划中
 - Phase 5 可选项：外部 text_to_image 插件对接联调、Plugin Pages 监控仪表盘（见 plan-v3 §14）
 
+## [3.3.1] - 2026-08-02
+
+### Fixed
+- **并发监控**（重大）：AstrBot 热重载/重复加载产生多个插件实例时，新旧实例的监控循环并发执行（同一账号 0.2 秒内被爬取两次、消息投递循环 1 秒内触发多次）。新增**跨模块实例共享的控制器注册表**（经 `sys.modules` 命名空间）：新控制器启动时自动停止仍在运行的旧控制器，保证**同一时刻仅一个监控控制器运行**
+- **监控间隔不更新**：统一/分层/每日维护三个后台循环的间隔仅在启动时读取一次，WebUI 修改 `fetch_interval_minutes` / 分层间隔 / `snapshot_interval_hours` 后不生效 → 改为**每轮动态读取**，并输出下次执行时间日志
+- 无变化通知在 `/stopmessage off` 暂停投递时不再误发
+
+### Changed
+- 无变化通知（`non_change_message`）默认值由 `false` 改为 `true`（与"有/无变化均主动投递报告"预期一致；可通过 `/non-change-message` 或 WebUI 调整）
+
+### Added
+- 新增 `tests/test_monitor_controller.py`（3 项：共享注册表单实例 / 新控制器停止旧控制器 / stop 幂等清理）
+
 ## [3.3.0] - 2026-08-02
 
 ### Added

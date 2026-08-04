@@ -287,9 +287,11 @@ async def _check_admin_alert(steam_id: str, fails: int) -> None:
 # ---------------------------------------------------------------------------
 
 async def _unified_monitor_worker(stop_flag) -> None:
-    """统一模式监控循环：所有用户按 fetch_interval_minutes 统一轮询。"""
-    interval = settings.fetch_interval_minutes
-    logger.info("启动统一模式监控循环，间隔=%d 分钟", interval)
+    """统一模式监控循环：所有用户按 fetch_interval_minutes 统一轮询。
+
+    interval 每轮从 settings 动态读取（WebUI / 指令修改即时生效，F2）。
+    """
+    logger.info("启动统一模式监控循环，间隔=%d 分钟", settings.fetch_interval_minutes)
     while not stop_flag.is_set():
         try:
             await monitor_all_users()
@@ -298,6 +300,12 @@ async def _unified_monitor_worker(stop_flag) -> None:
             raise
         except Exception as exc:
             logger.exception("统一模式监控循环异常：%s", exc)
+        interval = max(1, int(settings.fetch_interval_minutes))
+        next_run = datetime.now() + timedelta(minutes=interval)
+        logger.info(
+            "统一模式下一轮监控：%s（间隔 %d 分钟）",
+            next_run.strftime("%Y-%m-%d %H:%M:%S"), interval,
+        )
         await _sleep_interruptible(interval * 60, stop_flag)
 
 
@@ -310,9 +318,9 @@ async def _tiered_monitor_worker(stop_flag) -> None:
         settings.tier_low_interval_minutes,
     )
     workers = [
-        _tier_worker("high", settings.tier_high_interval_minutes, stop_flag),
-        _tier_worker("medium", settings.tier_medium_interval_minutes, stop_flag),
-        _tier_worker("low", settings.tier_low_interval_minutes, stop_flag),
+        _tier_worker("high", stop_flag),
+        _tier_worker("medium", stop_flag),
+        _tier_worker("low", stop_flag),
     ]
     try:
         await asyncio.gather(*workers)
@@ -321,9 +329,18 @@ async def _tiered_monitor_worker(stop_flag) -> None:
         raise
 
 
-async def _tier_worker(tier: str, interval_minutes: int, stop_flag) -> None:
-    """单层级 Worker 循环。"""
-    logger.info("启动层级 %s 监控循环，间隔=%d 分钟", tier, interval_minutes)
+def _tier_interval(tier: str) -> int:
+    """按层级读取间隔（分钟），每轮动态获取（F2）。"""
+    return {
+        "high": settings.tier_high_interval_minutes,
+        "medium": settings.tier_medium_interval_minutes,
+        "low": settings.tier_low_interval_minutes,
+    }.get(tier, 20)
+
+
+async def _tier_worker(tier: str, stop_flag) -> None:
+    """单层级 Worker 循环（interval 每轮动态读取，F2）。"""
+    logger.info("启动层级 %s 监控循环，间隔=%d 分钟", tier, _tier_interval(tier))
     while not stop_flag.is_set():
         try:
             result = await monitor_tier(tier)
@@ -336,7 +353,13 @@ async def _tier_worker(tier: str, interval_minutes: int, stop_flag) -> None:
             raise
         except Exception as exc:
             logger.exception("层级 %s 监控循环异常：%s", tier, exc)
-        await _sleep_interruptible(interval_minutes * 60, stop_flag)
+        interval = max(1, int(_tier_interval(tier)))
+        next_run = datetime.now() + timedelta(minutes=interval)
+        logger.info(
+            "层级 %s 下一轮监控：%s（间隔 %d 分钟）",
+            tier, next_run.strftime("%Y-%m-%d %H:%M:%S"), interval,
+        )
+        await _sleep_interruptible(interval * 60, stop_flag)
 
 
 async def _message_flush_loop(stop_flag) -> None:
@@ -369,14 +392,17 @@ async def _daily_maintenance_loop(stop_flag) -> None:
 
     snapshot_interval_hours=0：每天 compact_hour 执行一次（首个周期对齐到下一个整点）；
     >0：每 N 小时执行一次（ver3.x 小时级归档行为）。
+    两种模式均每轮动态读取配置（F2）。
     """
-    interval_hours = settings.snapshot_interval_hours
-    compact_hour = settings.compact_hour
+    while not stop_flag.is_set():
+        interval_hours = int(settings.snapshot_interval_hours)
+        compact_hour = int(settings.compact_hour)
 
-    if interval_hours > 0:
-        logger.info("启动小时级维护循环，间隔=%d 小时", interval_hours)
-        while not stop_flag.is_set():
+        if interval_hours > 0:
+            # 小时级模式
             await _sleep_interruptible(interval_hours * 3600, stop_flag)
+            if stop_flag.is_set():
+                return
             try:
                 await run_daily_maintenance()
             except asyncio.CancelledError:
@@ -384,25 +410,27 @@ async def _daily_maintenance_loop(stop_flag) -> None:
                 raise
             except Exception as exc:
                 logger.exception("小时级维护循环异常：%s", exc)
-        return
-
-    # 每日模式：计算到下一个 compact_hour 的等待秒数，之后每 24h 一次
-    now = datetime.now()
-    target = now.replace(hour=compact_hour, minute=0, second=0, microsecond=0)
-    if target <= now:
-        target += timedelta(days=1)
-    wait_seconds = int((target - now).total_seconds())
-    logger.info("启动每日维护循环，每日 %02d:00 执行，首次 %d 秒后", compact_hour, wait_seconds)
-    await _sleep_interruptible(wait_seconds, stop_flag)
-    while not stop_flag.is_set():
-        try:
-            await run_daily_maintenance()
-        except asyncio.CancelledError:
-            logger.info("每日维护循环已取消")
-            raise
-        except Exception as exc:
-            logger.exception("每日维护循环异常：%s", exc)
-        await _sleep_interruptible(24 * 3600, stop_flag)
+        else:
+            # 每日模式：计算到下一个 compact_hour 的等待秒数，之后每 24h 一次
+            now = datetime.now()
+            target = now.replace(hour=compact_hour, minute=0, second=0, microsecond=0)
+            if target <= now:
+                target += timedelta(days=1)
+            wait_seconds = int((target - now).total_seconds())
+            logger.info(
+                "每日维护下次执行：%s（每日 %02d:00）",
+                target.strftime("%Y-%m-%d %H:%M:%S"), compact_hour,
+            )
+            await _sleep_interruptible(wait_seconds, stop_flag)
+            if stop_flag.is_set():
+                return
+            try:
+                await run_daily_maintenance()
+            except asyncio.CancelledError:
+                logger.info("每日维护循环已取消")
+                raise
+            except Exception as exc:
+                logger.exception("每日维护循环异常：%s", exc)
 
 
 async def _sleep_interruptible(seconds: float, stop_flag) -> None:
@@ -451,6 +479,20 @@ async def cleanup_old_archives() -> int:
 # MonitorController — 后台任务生命周期管理
 # ---------------------------------------------------------------------------
 
+def _get_shared_guard() -> dict:
+    """跨模块实例共享的控制器注册表。
+
+    AstrBot 热重载时可能产生新旧两个插件模块对象（各自拥有独立的
+    `_monitor_lock`，导致并发监控）。通过 sys.modules 命名空间共享
+    活跃控制器引用，保证**同一时刻只允许一个监控控制器运行**。
+    """
+    import sys
+    key = "__monitor_plugin3_controller_guard__"
+    if key not in sys.modules:
+        sys.modules[key] = {"controller": None}
+    return sys.modules[key]
+
+
 class MonitorController:
     """监控后台任务控制器：启动、停止、状态查询（对应 plan-v3 §5.3 三个循环）。"""
 
@@ -461,25 +503,62 @@ class MonitorController:
         self._running = False
 
     async def start(self) -> None:
-        """启动三个后台循环。"""
+        """启动三个后台循环。
+
+        防多实例（F1）：启动前检查共享注册表，若已有运行中的控制器
+        （AstrBot 重载残留的旧实例），先将其停止，避免并发监控。
+        """
         if self._running:
             logger.info("监控后台任务已在运行中")
             return
-        self._running = True
-        self._stop_flag = asyncio.Event()
-        self._tasks = []
 
-        if settings.tiered_scheduling_enabled:
-            self._tasks.append(asyncio.create_task(_tiered_monitor_worker(self._stop_flag)))
+        guard = _get_shared_guard()
+        active = guard["controller"]
+        need_stop = None
+        if active is not None and active is not self and active.running:
+            need_stop = active
+
+        if need_stop is None:
+            # 无并发竞争者：先占位（原子，无 await），再启动循环
+            guard["controller"] = self
+            self._running = True
+            self._stop_flag = asyncio.Event()
+            self._tasks = []
+
+            if settings.tiered_scheduling_enabled:
+                self._tasks.append(asyncio.create_task(_tiered_monitor_worker(self._stop_flag)))
+            else:
+                self._tasks.append(asyncio.create_task(_unified_monitor_worker(self._stop_flag)))
+            self._tasks.append(asyncio.create_task(_message_flush_loop(self._stop_flag)))
+            self._tasks.append(asyncio.create_task(_daily_maintenance_loop(self._stop_flag)))
+            logger.info("监控后台任务已全部启动（%d 个 Task）", len(self._tasks))
         else:
-            self._tasks.append(asyncio.create_task(_unified_monitor_worker(self._stop_flag)))
-        self._tasks.append(asyncio.create_task(_message_flush_loop(self._stop_flag)))
-        self._tasks.append(asyncio.create_task(_daily_maintenance_loop(self._stop_flag)))
-        logger.info("监控后台任务已全部启动（%d 个 Task）", len(self._tasks))
+            # 存在重载残留的旧控制器：先停止它，再占用注册并启动
+            logger.warning(
+                "检测到已有运行中的监控控制器（疑似插件重载残留），正在停止旧实例..."
+            )
+            await need_stop.stop()
+            guard = _get_shared_guard()
+            guard["controller"] = self
+            self._running = True
+            self._stop_flag = asyncio.Event()
+            self._tasks = []
+
+            if settings.tiered_scheduling_enabled:
+                self._tasks.append(asyncio.create_task(_tiered_monitor_worker(self._stop_flag)))
+            else:
+                self._tasks.append(asyncio.create_task(_unified_monitor_worker(self._stop_flag)))
+            self._tasks.append(asyncio.create_task(_message_flush_loop(self._stop_flag)))
+            self._tasks.append(asyncio.create_task(_daily_maintenance_loop(self._stop_flag)))
+            logger.info("已接管监控后台任务（%d 个 Task）", len(self._tasks))
 
     async def stop(self) -> None:
-        """停止三个后台循环（取消 Task 并等待收尾）。"""
+        """停止三个后台循环（取消 Task 并等待收尾），并释放共享注册。"""
         if not self._running:
+            # 即使未运行，也确保注册被清理
+            guard = _get_shared_guard()
+            if guard.get("controller") is self:
+                guard["controller"] = None
             return
         self._running = False
         self._stop_flag.set()
@@ -489,6 +568,9 @@ class MonitorController:
         if self._tasks:
             await asyncio.gather(*self._tasks, return_exceptions=True)
         self._tasks = []
+        guard = _get_shared_guard()
+        if guard.get("controller") is self:
+            guard["controller"] = None
         logger.info("监控后台任务已全部停止")
 
     @property

@@ -13,8 +13,8 @@ desc: |
   - 每日快照归档 + 过期数据清理
   - 软删除/回收站管理
   - 全量数据导入导出（cs2mon 格式）
-version: 3.3.0
-author: Reasonix Team
+version: 3.3.1
+author: Cheney
 repo: https://github.com/Yyyyyylor/monitor-plugin3
 astrbot_version: ">=4.16"
 support_platforms:

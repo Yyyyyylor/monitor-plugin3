@@ -166,7 +166,7 @@ class PluginSettings:
     # ---- 无变化通知 ----
     @property
     def non_change_message_enabled(self) -> bool:
-        return self._get("non_change_message", default=False)
+        return self._get("non_change_message", default=True)
 
 
 # 模块级可变单例：导入即存在（非 None），setup_settings 只更新其内部引用

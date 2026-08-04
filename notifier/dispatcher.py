@@ -255,6 +255,11 @@ async def notify_no_change(users, stats: dict[str, Any] | None = None) -> int:
         logger.warning("dispatcher 未初始化，跳过无变化通知")
         return 0
 
+    # /stopmessage off 暂停投递时不发无变化通知
+    plugin = getattr(_global_dispatcher, "plugin", None)
+    if plugin is not None and not getattr(plugin, "_message_enabled", True):
+        return 0
+
     # 按会话去重（一个 QQ 会话监控多个 Steam 只发一条）
     umos = {
         getattr(u, "bound_umo", None)
