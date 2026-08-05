@@ -206,7 +206,7 @@ monitor-plugin3/
 
 ## 许可协议
 
-MIT License
+本项目采用 [MIT License](LICENSE)（Copyright © 2026 Cheney）
 
 ---
 
