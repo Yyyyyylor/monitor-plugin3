@@ -2,6 +2,8 @@
 
 > 基于 monitor ver3.x 构建的 Steam CS2 库存监控器插件（plan-v3 完整实现）
 
+**中文** | **[English](README_EN.md)**
+
 ## 项目简介
 
 运行在 AstrBot 框架内的 Steam CS2 库存监控系统：支持多账号分层定时爬取、四类差异检测（新增/移除/修改/交换）、库存活动分类，并通过 QQ Bot 按可配置间隔自动批量推送变化消息（支持文生图渲染）。未经监控的新库存也可通过 `/getinventory` 随时查询。
